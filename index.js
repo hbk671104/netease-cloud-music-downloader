@@ -1,13 +1,14 @@
 import axios from 'axios'
+import fs from 'node:fs'
 
-const playlist = await axios.get(
-  `${Bun.env.NETEAST_CLOUD_URL}/playlist/track/all`,
-  {
-    params: {
-      id: 2044230836,
-    },
-  }
-)
+const apiRoot = Bun.env.NETEASE_MUSIC_URL
+const playlistId = Bun.env.PLAYLIST_ID
+
+const playlist = await axios.get(`${apiRoot}/playlist/track/all`, {
+  params: {
+    id: playlistId,
+  },
+})
 
 if (playlist.status !== 200) {
   throw new Error('Failed to fetch playlist')
@@ -15,7 +16,7 @@ if (playlist.status !== 200) {
 
 const ids = playlist.data?.songs.map((song) => song.id).join(',')
 
-let urls = await axios.get(`${Bun.env.NETEAST_CLOUD_URL}/song/url`, {
+const urls = await axios.get(`${apiRoot}/song/url`, {
   params: { id: ids, br: 320000 },
 })
 
@@ -23,6 +24,23 @@ if (urls.status !== 200) {
   throw new Error('Failed to fetch song urls')
 }
 
-urls = urls.data?.data.map((song) => song.url)
+// gather metadata
+const metadata = urls.data?.data.map((song, index) => ({
+  url: song.url,
+  name: playlist.data?.songs[index].name,
+  id: song.id,
+}))
 
-await Bun.write('./output/download-urls.txt', urls.join('\n'))
+// write metadata to file
+await Bun.write('./output/meta.json', JSON.stringify(metadata))
+
+// download songs
+const fileStreams = await Promise.all(
+  metadata.map((song) => axios.get(song.url, { responseType: 'stream' }))
+)
+
+// write song streams to file
+fileStreams.forEach((stream, index) => {
+  const name = playlist.data?.songs[index].name
+  stream.data.pipe(fs.createWriteStream(`./output/${name}.mp3`))
+})
