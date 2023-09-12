@@ -1,16 +1,28 @@
-console.log('Hello via Bun!')
+import axios from 'axios'
 
-let playlist = await fetch(
-  `${Bun.env.NETEAST_CLOUD_URL}/playlist/track/all?id=2044230836`
+const playlist = await axios.get(
+  `${Bun.env.NETEAST_CLOUD_URL}/playlist/track/all`,
+  {
+    params: {
+      id: 2044230836,
+    },
+  }
 )
-playlist = await playlist.json()
 
-const ids = playlist.songs.map((song) => song.id).join(',')
+if (playlist.status !== 200) {
+  throw new Error('Failed to fetch playlist')
+}
 
-let res = await fetch(
-  `${Bun.env.NETEAST_CLOUD_URL}/song/url?id=${ids}&br=320000`
-)
-res = await res.json()
-res = res.data.map((song) => song.url)
+const ids = playlist.data?.songs.map((song) => song.id).join(',')
 
-await Bun.write('./output/download-urls.txt', res.join('\n'))
+let urls = await axios.get(`${Bun.env.NETEAST_CLOUD_URL}/song/url`, {
+  params: { id: ids, br: 320000 },
+})
+
+if (urls.status !== 200) {
+  throw new Error('Failed to fetch song urls')
+}
+
+urls = urls.data?.data.map((song) => song.url)
+
+await Bun.write('./output/download-urls.txt', urls.join('\n'))
