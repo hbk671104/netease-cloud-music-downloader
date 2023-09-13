@@ -15,6 +15,7 @@ const user = await axios.get(`${apiRoot}/login`, {
 
 const cookie = user.data?.cookie
 
+console.log('Fetching playlist...')
 const playlist = await axios.get(`${apiRoot}/playlist/track/all`, {
   params: {
     id: playlistId,
@@ -28,6 +29,7 @@ if (playlist.status !== 200) {
 
 const ids = playlist.data?.songs.map((song) => song.id).join(',')
 
+console.log('Fetching song urls...')
 const urls = await axios.get(`${apiRoot}/song/url`, {
   params: { id: ids, br: 320000, cookie },
 })
@@ -37,21 +39,24 @@ if (urls.status !== 200) {
 }
 
 // gather metadata
-const metadata = urls.data?.data.map((song, index) => ({
-  ...song,
-  name: playlist.data?.songs[index].name,
-}))
+const metadata = urls.data?.data
+  .filter((song) => song.url)
+  .map((song, index) => ({
+    ...song,
+    name: playlist.data?.songs[index].name,
+  }))
 
 // write metadata to file
 await Bun.write('./output/meta.json', JSON.stringify(metadata))
 
 // download songs
+console.log('Downloading songs...')
 const fileStreams = await Promise.all(
   metadata.map((song) => axios.get(song.url, { responseType: 'stream' }))
 )
 
 // write song streams to file
 fileStreams.forEach((stream, index) => {
-  const name = playlist.data?.songs[index].name
-  stream.data.pipe(fs.createWriteStream(`./output/${name}.mp3`))
+  const { name, type } = metadata[index]
+  stream.data.pipe(fs.createWriteStream(`./output/${name}.${type}`))
 })
