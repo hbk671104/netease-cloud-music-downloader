@@ -2,11 +2,23 @@ import axios from 'axios'
 import fs from 'node:fs'
 
 const apiRoot = Bun.env.NETEASE_MUSIC_URL
+const email = Bun.env.EMAIL
+const password = Bun.env.PASSWORD
 const playlistId = Bun.env.PLAYLIST_ID
+
+const user = await axios.get(`${apiRoot}/login`, {
+  params: {
+    email,
+    password,
+  },
+})
+
+const cookie = user.data?.cookie
 
 const playlist = await axios.get(`${apiRoot}/playlist/track/all`, {
   params: {
     id: playlistId,
+    cookie,
   },
 })
 
@@ -17,7 +29,7 @@ if (playlist.status !== 200) {
 const ids = playlist.data?.songs.map((song) => song.id).join(',')
 
 const urls = await axios.get(`${apiRoot}/song/url`, {
-  params: { id: ids, br: 320000 },
+  params: { id: ids, br: 320000, cookie },
 })
 
 if (urls.status !== 200) {
@@ -26,9 +38,8 @@ if (urls.status !== 200) {
 
 // gather metadata
 const metadata = urls.data?.data.map((song, index) => ({
-  url: song.url,
+  ...song,
   name: playlist.data?.songs[index].name,
-  id: song.id,
 }))
 
 // write metadata to file
