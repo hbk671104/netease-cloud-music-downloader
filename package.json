@@ -1,5 +1,7 @@
 {
   "name": "netease-cloud-music-downloader",
+  "version": "0.0.1",
+  "author": "Bokang Huang <hbk671104@gmail.com>",
   "module": "index.js",
   "type": "module",
   "devDependencies": {
